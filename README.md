@@ -39,6 +39,11 @@ S-parks V4 是基于 `sparks-v3.5` 升级出的独立静态原型版本，重点
 - `#search`: 搜索结果页原型
 - `#collections`: 收藏夹 / 项目夹原型
 
+## 部署地址
+
+- GitHub: `https://github.com/logifore/s-parks-v4`
+- Vercel: `https://s-parks-v4.vercel.app`
+
 ## 本地预览
 
 ```bash
