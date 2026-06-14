@@ -1,7 +1,7 @@
 "use strict";
 
 window.SparksRenderers = ((utils) => {
-  const { escapeHtml, icon, image, pageShell, stat } = utils;
+  const { escapeHtml, icon, image, pageShell } = utils;
   const content = window.SPARKS_CONTENT;
   const hrefFor = (route, value) => window.SparksRouter.hrefFor(route, value);
   const DEFAULT_ASSET = content.assets.items[0];
@@ -48,6 +48,10 @@ window.SparksRenderers = ((utils) => {
     return Object.values(state.projects || {}).some((project) => project.assets.some((entry) => entry.assetId === assetId));
   }
 
+  function pressedAttr(active) {
+    return `aria-pressed="${active ? "true" : "false"}"`;
+  }
+
   function assetCard(asset, options = {}) {
     const wide = options.wide ? " wide" : "";
     return `
@@ -62,24 +66,6 @@ window.SparksRenderers = ((utils) => {
           ${icon("open_in_new")}
         </div>
       </a>
-    `;
-  }
-
-  function creatorCard(creator, compact = false) {
-    return `
-      <article class="glass-panel community-card profile-card ${compact ? "compact-profile" : ""}">
-        ${image(creator.image, creator.name, "avatar large-avatar")}
-        <div>
-          <span>${escapeHtml(creator.role)}</span>
-          <h2>${escapeHtml(creator.name)}</h2>
-          <p>${escapeHtml(creator.status)}</p>
-        </div>
-        <div class="stats-row">
-          ${stat("上传", creator.stats.uploads)}
-          ${stat("收益", creator.stats.revenue)}
-        </div>
-        <a class="button button-ghost compact" href="${escapeHtml(hrefFor("creator", creator.id || creator.name.toLowerCase().replaceAll(" ", "-")))}" data-action="open-creator" data-creator="${escapeHtml(creator.id || creator.name.toLowerCase().replaceAll(" ", "-"))}">查看主页</a>
-      </article>
     `;
   }
 
@@ -423,26 +409,35 @@ window.SparksRenderers = ((utils) => {
 
   function renderAssetBrowser(appContent, state, includeShell) {
     const { assets } = appContent;
+    const categories = ["全部", "角色", "环境", "载具", "分镜脚本"];
     const selected = state.selectedCategory || "全部";
     const query = state.query.trim().toLowerCase();
     const matches = assets.items.filter((asset) => {
-      const target = `${asset.name} ${asset.meta} ${asset.category} ${asset.creator}`.toLowerCase();
-      const categoryMatch = selected === "全部" || asset.category === selected;
+      const type = refineAssetType(asset.category);
+      const target = `${asset.name} ${asset.meta} ${asset.category} ${type} ${asset.creator}`.toLowerCase();
+      const categoryMatch = selected === "全部" || type === selected;
       return categoryMatch && (!query || target.includes(query));
     });
 
-    const filters = ["全部", ...assets.filters];
+    const searchHref = hrefFor("search", {
+      q: state.query.trim(),
+      category: selected === "全部" ? "" : selected
+    });
     const body = `
       <div class="control-bar control-bar-v4" role="region" aria-label="素材筛选">
         <div class="segmented-control" aria-label="素材分类">
-          ${filters.map((filter) => `<button class="${filter === selected ? "active" : ""}" type="button" data-action="filter-category" data-category="${escapeHtml(filter)}">${escapeHtml(filter)}</button>`).join("")}
+          ${categories.map((filter) => `<button class="${filter === selected ? "active" : ""}" type="button" ${pressedAttr(filter === selected)} data-action="filter-category" data-category="${escapeHtml(filter)}">${escapeHtml(filter)}</button>`).join("")}
         </div>
-        <a class="button button-primary compact" href="#search">${icon("tune")} 高级筛选</a>
+        <a class="button button-primary compact" href="${escapeHtml(searchHref)}">${icon("tune")} 高级筛选</a>
       </div>
       <div class="chips" aria-label="筛选维度">
         ${assets.facets.map((filter) => `<span>${escapeHtml(filter)}</span>`).join("")}
       </div>
-      <div class="result-line">找到 <strong>${matches.length}</strong> 个素材${query ? ` · 关键词：${escapeHtml(state.query)}` : ""}</div>
+      <div class="result-line">
+        找到 <strong>${matches.length}</strong> 个素材
+        ${query ? `<span class="result-pill">关键词 · ${escapeHtml(state.query)}</span>` : ""}
+        ${selected !== "全部" ? `<span class="result-pill">分类 · ${escapeHtml(selected)}</span>` : ""}
+      </div>
       <div class="asset-grid asset-grid-v4">
         ${matches.map((asset, index) => assetCard(asset, { wide: index === 0 })).join("") || `<article class="empty-state glass-panel"><h2>没有匹配素材</h2><p>换一个关键词或分类试试。</p></article>`}
       </div>
@@ -450,7 +445,7 @@ window.SparksRenderers = ((utils) => {
         <div class="section-title">
           <span class="eyebrow">Scene Variants</span>
           <h2>时间切换和构图一致性继续保留，并升级成更像精选陈列</h2>
-          <p>原版的场景切换能力继续可用，V4 主要重做呈现方式、阅读顺序和信息密度。</p>
+          <p>原版的场景切换能力继续可用，V4.5 这一轮重点重做筛选反馈、阅读顺序和信息密度。</p>
         </div>
         <div class="scene-grid">
           ${assets.scenes.map((scene) => `<article class="glass-panel scene-card"><h3>${escapeHtml(scene.name)}</h3><p>${escapeHtml(scene.meta)}</p></article>`).join("")}
@@ -483,7 +478,7 @@ window.SparksRenderers = ((utils) => {
           </div>
           <div class="asset-category-list">
             ${categories.map((category) => `
-              <button class="asset-category-item ${selected === category ? "active" : ""}" type="button" data-action="filter-category" data-category="${escapeHtml(category)}">
+              <button class="asset-category-item ${selected === category ? "active" : ""}" type="button" ${pressedAttr(selected === category)} data-action="filter-category" data-category="${escapeHtml(category)}">
                 ${icon(assetCategoryIcon(category))}
                 <span>${escapeHtml(category)}</span>
               </button>
@@ -613,7 +608,7 @@ window.SparksRenderers = ((utils) => {
           <div class="chips">${detail.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
           ${asset.id === "river-dusk-suite" ? `
             <div class="time-switch" aria-label="场景时间切换">
-              ${Object.entries(sceneVariants).map(([key, item]) => `<button class="${key === currentTime ? "active" : ""}" type="button" data-action="set-scene-time" data-time="${key}">${escapeHtml(item.label)}</button>`).join("")}
+              ${Object.entries(sceneVariants).map(([key, item]) => `<button class="${key === currentTime ? "active" : ""}" type="button" ${pressedAttr(key === currentTime)} data-action="set-scene-time" data-time="${key}">${escapeHtml(item.label)}</button>`).join("")}
             </div>
           ` : ""}
           <div class="inline-profile glass-panel">
@@ -692,10 +687,10 @@ window.SparksRenderers = ((utils) => {
           <a class="button button-primary" href="#upload">成为创作者</a>
         </section>
 
-        <nav class="creator-tabs-v4">
-          <button class="${tab === "works" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="works">个人作品</button>
-          <button class="${tab === "assets" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="assets">已上传素材</button>
-          <button class="${tab === "collections" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="collections">收藏</button>
+        <nav class="creator-tabs-v4" aria-label="创作者内容切换">
+          <button class="${tab === "works" ? "active" : ""}" type="button" ${pressedAttr(tab === "works")} data-action="set-creator-tab" data-tab="works">个人作品</button>
+          <button class="${tab === "assets" ? "active" : ""}" type="button" ${pressedAttr(tab === "assets")} data-action="set-creator-tab" data-tab="assets">已上传素材</button>
+          <button class="${tab === "collections" ? "active" : ""}" type="button" ${pressedAttr(tab === "collections")} data-action="set-creator-tab" data-tab="collections">收藏</button>
         </nav>
 
         ${tab === "works" ? creatorWorkCards(creator) : ""}
@@ -744,10 +739,10 @@ window.SparksRenderers = ((utils) => {
               ["累计收益", "￥89,400"]
             ].map(([label, value]) => `<article><span>${label}</span><strong>${value}</strong></article>`).join("")}
           </div>
-          <nav class="creator-studio-tabs">
-            <button class="${tab === "works" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="works">My Works</button>
-            <button class="${tab === "assets" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="assets">Shared Assets</button>
-            <button class="${tab === "collections" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="collections">Collections</button>
+          <nav class="creator-studio-tabs" aria-label="Creator workspace tabs">
+            <button class="${tab === "works" ? "active" : ""}" type="button" ${pressedAttr(tab === "works")} data-action="set-creator-tab" data-tab="works">My Works</button>
+            <button class="${tab === "assets" ? "active" : ""}" type="button" ${pressedAttr(tab === "assets")} data-action="set-creator-tab" data-tab="assets">Shared Assets</button>
+            <button class="${tab === "collections" ? "active" : ""}" type="button" ${pressedAttr(tab === "collections")} data-action="set-creator-tab" data-tab="collections">Collections</button>
           </nav>
           ${tab === "works" ? creatorWorkCards(creator) : ""}
           ${tab === "assets" ? `<div class="creator-assets-list">${creator.assets.map((id) => {
@@ -776,10 +771,10 @@ window.SparksRenderers = ((utils) => {
         <div class="creator-gallery-stats">
           ${Object.entries(creator.stats).map(([label, value]) => `<div><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("")}
         </div>
-        <nav class="creator-gallery-tabs">
-          <button class="${tab === "works" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="works">个人作品</button>
-          <button class="${tab === "assets" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="assets">已上传素材</button>
-          <button class="${tab === "collections" ? "active" : ""}" type="button" data-action="set-creator-tab" data-tab="collections">收藏</button>
+        <nav class="creator-gallery-tabs" aria-label="创作者内容切换">
+          <button class="${tab === "works" ? "active" : ""}" type="button" ${pressedAttr(tab === "works")} data-action="set-creator-tab" data-tab="works">个人作品</button>
+          <button class="${tab === "assets" ? "active" : ""}" type="button" ${pressedAttr(tab === "assets")} data-action="set-creator-tab" data-tab="assets">已上传素材</button>
+          <button class="${tab === "collections" ? "active" : ""}" type="button" ${pressedAttr(tab === "collections")} data-action="set-creator-tab" data-tab="collections">收藏</button>
         </nav>
         ${tab === "works" ? creatorWorkCards(creator) : ""}
         ${tab === "assets" ? `<div class="creator-assets-list">${creator.assets.map((id) => {
@@ -944,9 +939,14 @@ window.SparksRenderers = ((utils) => {
 
   function renderSearch(appContent, state) {
     const flow = appContent.flows.search;
-    const query = state.query || "角色 三视图 场景";
+    const query = state.query.trim();
+    const selected = state.selectedCategory || "全部";
     const body = `
-      <div class="search-summary glass-panel"><span>当前搜索</span><strong>${escapeHtml(query)}</strong></div>
+      <div class="search-summary glass-panel">
+        <span>当前搜索</span>
+        <strong>${escapeHtml(query || "未输入关键词")}</strong>
+        <p>${selected === "全部" ? "正在浏览全部素材。" : `当前只查看 ${escapeHtml(selected)} 分类。`}</p>
+      </div>
       ${renderAssetBrowser(appContent, state, false)}
     `;
     return pageShell("搜索结果", flow.title, flow.subtitle, body, "search-page");

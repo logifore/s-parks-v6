@@ -31,6 +31,16 @@ window.SparksRouter = ((content, renderers) => {
   }
 
   function hrefFor(route, value) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const search = new URLSearchParams();
+      Object.entries(value).forEach(([key, rawValue]) => {
+        if (rawValue === undefined || rawValue === null || rawValue === "") return;
+        search.set(key, rawValue);
+      });
+      const query = search.toString();
+      return query ? `#${route}?${query}` : `#${route}`;
+    }
+
     const key = dynamicKeys[route];
     if (!key || !value) return `#${route}`;
     return `#${route}?${key}=${encodeURIComponent(value)}`;

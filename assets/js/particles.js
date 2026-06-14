@@ -4,7 +4,6 @@ window.SparksParticles = (() => {
   function init(canvas) {
     if (!canvas) return;
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const isCompactViewport = window.innerWidth <= 680;
 
     if (prefersReducedMotion) {
       initFallback(canvas, { reducedMotion: true });
@@ -115,6 +114,7 @@ window.SparksParticles = (() => {
 
     function resize() {
       const scale = Math.min(window.devicePixelRatio || 1, 2);
+      const isCompactViewport = window.innerWidth <= 680;
       const densityScale = isCompactViewport ? Math.min(scale, 1.25) : scale;
       const width = Math.floor(window.innerWidth * densityScale);
       const height = Math.floor(window.innerHeight * densityScale);

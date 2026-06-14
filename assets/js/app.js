@@ -12,6 +12,8 @@
   const DEFAULT_CREATOR_ID = content.community.people[0];
   const DEFAULT_PROJECT_ID = "short-drama-a";
   const CREATOR_TABS = new Set(["works", "assets", "collections"]);
+  const FILTER_CATEGORIES = new Set(["全部", "角色", "环境", "载具", "分镜脚本"]);
+  const SCENE_TIME_KEYS = new Set(["day", "dusk", "night"]);
 
   function cloneValue(value) {
     if (typeof structuredClone === "function") return structuredClone(value);
@@ -34,6 +36,10 @@
     return cloneValue(content.downloads.queue);
   }
 
+  function normalizeFilterCategory(category) {
+    return FILTER_CATEGORIES.has(category) ? category : "全部";
+  }
+
   function getAssetById(assetId) {
     return content.assets.items.find((item) => item.id === assetId) || content.assets.items[0];
   }
@@ -48,10 +54,6 @@
 
   function isKnownProject(projectId) {
     return projectIds.has(projectId);
-  }
-
-  function isAssetCollected(assetId) {
-    return Object.values(state.projects).some((project) => project.assets.some((entry) => entry.assetId === assetId));
   }
 
   function countPendingPurchases() {
@@ -145,9 +147,11 @@
   function syncRouteState() {
     state.route = router.routeFromHash();
     const params = router.paramsFromHash();
+    const query = typeof params.q === "string" ? params.q : "";
 
     if (state.route === "detail" || state.route === "licensing") {
       state.detailAssetId = isKnownAsset(params.asset) ? params.asset : DEFAULT_ASSET_ID;
+      state.sceneTime = SCENE_TIME_KEYS.has(params.time) ? params.time : state.sceneTime || "day";
     }
 
     if (state.route === "creator") {
@@ -158,6 +162,13 @@
     if (state.route === "project") {
       state.activeProjectId = isKnownProject(params.project) ? params.project : DEFAULT_PROJECT_ID;
     }
+
+    if (state.route === "assets" || state.route === "search") {
+      state.selectedCategory = normalizeFilterCategory(params.category);
+      state.query = query;
+    } else if (query) {
+      state.query = query;
+    }
   }
 
   recomputeProjectDerivedState();
@@ -165,15 +176,77 @@
 
   const app = document.getElementById("app");
   const header = document.querySelector(".site-header");
+  const brandLink = document.querySelector(".brand");
   const nav = document.querySelector("[data-site-nav]");
   const menuButton = document.querySelector("[data-menu-button]");
+  const headerActions = document.querySelector(".header-actions");
   const searchInput = document.getElementById("site-search");
+  const siteFooter = document.querySelector(".site-footer");
   let creatorMenuCloseTimer = 0;
+  let lastMenuFocusTarget = null;
+  let focusMainOnNextHashChange = true;
+
+  function isMobileViewport() {
+    return window.innerWidth <= 920;
+  }
+
+  function setElementModalState(element, hidden) {
+    if (!element) return;
+    element.inert = hidden;
+    element.setAttribute("aria-hidden", String(hidden));
+  }
+
+  function syncMobileModalState() {
+    const mobileOverlayOpen = state.menuOpen && isMobileViewport();
+    setElementModalState(app, mobileOverlayOpen);
+    setElementModalState(brandLink, mobileOverlayOpen);
+    setElementModalState(headerActions, mobileOverlayOpen);
+    setElementModalState(siteFooter, mobileOverlayOpen);
+    nav.inert = !state.menuOpen && isMobileViewport();
+  }
+
+  function updateSearchField() {
+    if (searchInput.value !== state.query) searchInput.value = state.query;
+  }
+
+  function buildAssetRouteParams() {
+    const params = {};
+    const query = state.query.trim();
+    if (query) params.q = query;
+    if (state.selectedCategory !== "全部") params.category = state.selectedCategory;
+    return params;
+  }
+
+  function currentDetailRouteParams() {
+    const params = { asset: state.detailAssetId };
+    if (SCENE_TIME_KEYS.has(state.sceneTime)) params.time = state.sceneTime;
+    return params;
+  }
+
+  function focusFirstMenuItem() {
+    const target = nav.querySelector("a, button");
+    if (target) target.focus({ preventScroll: true });
+  }
 
   function setMenuOpen(open) {
+    const wasOpen = state.menuOpen;
     state.menuOpen = Boolean(open);
+    if (state.menuOpen && isMobileViewport()) {
+      lastMenuFocusTarget = document.activeElement instanceof HTMLElement ? document.activeElement : menuButton;
+    }
+    if (!state.menuOpen) {
+      state.creatorMenuOpen = false;
+    }
     document.body.dataset.menuOpen = String(state.menuOpen);
-    app.setAttribute("aria-hidden", String(state.menuOpen && window.innerWidth <= 920));
+    syncMobileModalState();
+    if (state.menuOpen && isMobileViewport()) {
+      window.requestAnimationFrame(focusFirstMenuItem);
+    }
+    if (wasOpen && !state.menuOpen && isMobileViewport()) {
+      window.requestAnimationFrame(() => {
+        (lastMenuFocusTarget || menuButton).focus({ preventScroll: true });
+      });
+    }
   }
 
   function closeMenu() {
@@ -207,6 +280,9 @@
         return `
           <div class="nav-item nav-item-with-submenu" data-nav-group="creator" data-open="false">
             <a href="#community" data-route="community" data-creator-trigger="true" aria-haspopup="true" aria-expanded="false">${escapeHtml(item.label)}</a>
+            <button class="nav-submenu-toggle" type="button" aria-label="展开创作者菜单" aria-haspopup="true" aria-expanded="false" data-creator-menu-toggle>
+              <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+            </button>
             <div class="nav-submenu" aria-label="创作者菜单">
               <a href="#community" data-route="community">浏览创作者</a>
               <a href="#creator-onboarding" data-route="creator-onboarding">成为创作者</a>
@@ -234,6 +310,7 @@
     document.body.dataset.route = state.route;
     document.body.dataset.pageTone = currentPageTone();
     app.innerHTML = router.renderRoute(state.route, state);
+    updateSearchField();
     document.title = `S-parks | ${router.navLabel(state.route)}`;
     updateChrome();
     if (focusMain) app.focus({ preventScroll: true });
@@ -243,6 +320,7 @@
     document.body.dataset.route = state.route;
     document.body.dataset.pageTone = currentPageTone();
     app.innerHTML = router.renderRoute(state.route, state);
+    updateSearchField();
     updateChrome();
     if (message) showToast(message);
   }
@@ -261,9 +339,12 @@
     nav.setAttribute("aria-hidden", String(!state.menuOpen && window.innerWidth <= 920));
     const creatorGroup = nav.querySelector("[data-nav-group='creator']");
     const creatorTrigger = nav.querySelector("[data-creator-trigger='true']");
+    const creatorMenuToggle = nav.querySelector("[data-creator-menu-toggle]");
     if (creatorGroup) creatorGroup.dataset.open = String(state.creatorMenuOpen);
     if (creatorTrigger) creatorTrigger.setAttribute("aria-expanded", String(state.creatorMenuOpen));
+    if (creatorMenuToggle) creatorMenuToggle.setAttribute("aria-expanded", String(state.creatorMenuOpen));
     header.dataset.elevated = String(window.scrollY > 8);
+    syncMobileModalState();
   }
 
   function showToast(message) {
@@ -276,12 +357,15 @@
     window.setTimeout(() => toast.remove(), 2200);
   }
 
-  function goToRoute(route, value = "") {
+  function goToRoute(route, value = "", options = {}) {
     const nextHash = router.hrefFor(route, value);
+    focusMainOnNextHashChange = options.focusMain !== false;
     if (window.location.hash !== nextHash) {
       window.location.hash = nextHash;
     } else {
       rerender();
+      if (focusMainOnNextHashChange) app.focus({ preventScroll: true });
+      focusMainOnNextHashChange = true;
     }
   }
 
@@ -290,14 +374,22 @@
     if (!action) return;
 
     if (action === "filter-category") {
-      state.selectedCategory = target.dataset.category || "全部";
-      rerender(`已筛选：${state.selectedCategory}`);
+      state.selectedCategory = normalizeFilterCategory(target.dataset.category);
+      if (state.route === "assets" || state.route === "search") {
+        goToRoute(state.route, buildAssetRouteParams(), { focusMain: false });
+      } else {
+        rerender(`已筛选：${state.selectedCategory}`);
+      }
       return;
     }
 
     if (action === "set-scene-time") {
       state.sceneTime = target.dataset.time || "day";
-      rerender("已切换场景时间");
+      if (state.route === "detail" || state.route === "licensing") {
+        goToRoute(state.route, currentDetailRouteParams(), { focusMain: false });
+      } else {
+        rerender("已切换场景时间");
+      }
       return;
     }
 
@@ -310,13 +402,17 @@
     if (action === "open-creator") {
       state.activeCreatorId = isKnownCreator(target.dataset.creator) ? target.dataset.creator : DEFAULT_CREATOR_ID;
       state.creatorTab = "works";
-      goToRoute("creator", state.activeCreatorId);
+      goToRoute("creator", { creator: state.activeCreatorId, tab: state.creatorTab });
       return;
     }
 
     if (action === "set-creator-tab") {
       state.creatorTab = CREATOR_TABS.has(target.dataset.tab) ? target.dataset.tab : "works";
-      rerender();
+      if (state.route === "creator") {
+        goToRoute("creator", { creator: state.activeCreatorId, tab: state.creatorTab }, { focusMain: false });
+      } else {
+        rerender();
+      }
       return;
     }
 
@@ -426,7 +522,10 @@
   }
 
   function bindEvents() {
-    window.addEventListener("hashchange", () => render(true));
+    window.addEventListener("hashchange", () => {
+      render(focusMainOnNextHashChange);
+      focusMainOnNextHashChange = true;
+    });
     window.addEventListener("scroll", updateChrome, { passive: true });
     window.addEventListener("resize", () => {
       if (window.innerWidth > 920) {
@@ -438,6 +537,16 @@
     menuButton.addEventListener("click", () => {
       setMenuOpen(!state.menuOpen);
       updateChrome();
+    });
+
+    nav.addEventListener("click", (event) => {
+      const menuToggle = event.target.closest("[data-creator-menu-toggle]");
+      if (menuToggle) {
+        event.preventDefault();
+        event.stopPropagation();
+        setCreatorMenuOpen(!state.creatorMenuOpen);
+        return;
+      }
     });
 
     const creatorMenuGroup = nav.querySelector("[data-nav-group='creator']");
@@ -463,12 +572,7 @@
 
     searchInput.addEventListener("input", (event) => {
       state.query = event.target.value;
-      state.selectedCategory = "全部";
-      if (state.route !== "search") {
-        window.location.hash = "search";
-      } else {
-        rerender();
-      }
+      goToRoute("search", buildAssetRouteParams(), { focusMain: false });
     });
 
     document.addEventListener("click", (event) => {

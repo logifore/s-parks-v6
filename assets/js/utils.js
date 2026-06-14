@@ -31,9 +31,5 @@ window.SparksUtils = (() => {
     `;
   }
 
-  function stat(label, value) {
-    return `<div class="stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-  }
-
-  return { escapeHtml, icon, image, pageShell, stat };
+  return { escapeHtml, icon, image, pageShell };
 })();

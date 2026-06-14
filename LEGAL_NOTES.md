@@ -1,8 +1,8 @@
-# S-parks V4 Legal And Safety Notes
+# S-parks V4.5 Legal And Safety Notes
 
 ## Current Status
 
-This folder is a static V4 UI prototype. It is not a production marketplace and does not include real authentication, payments, uploads, licensing records, or server-side moderation.
+This folder is a static V4.5 UI prototype. It is not a production marketplace and does not include real authentication, payments, uploads, licensing records, or server-side moderation.
 
 ## Image And Asset Sources
 
@@ -18,4 +18,4 @@ This folder is a static V4 UI prototype. It is not a production marketplace and 
 
 ## Product Notes
 
-The V4 prototype reflects the latest curated concept: AIGC video creators can discover character sheets, scene references, styling assets, prompts, creator profiles, creator onboarding, and purchase/licensing flows. The actual commercial workflow should be reviewed legally before launch.
+The V4.5 prototype reflects the latest curated concept: AIGC video creators can discover character sheets, scene references, styling assets, prompts, creator profiles, creator onboarding, and purchase/licensing flows. The actual commercial workflow should be reviewed legally before launch.

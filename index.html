@@ -10,12 +10,12 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; img-src 'self' https://lh3.googleusercontent.com data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
     >
-    <meta name="description" content="S-parks V4 本地版本预览。">
-    <title>S-parks V4 | Local Preview</title>
+    <meta name="description" content="S-parks V4.5 AIGC 创作者素材平台原型，作为现有 s-parks-v4 项目的升级版本发布。">
+    <title>S-parks V4.5 | AIGC Creator Prototype</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./assets/css/styles.css?v=sparks-v4.1">
+    <link rel="stylesheet" href="./assets/css/styles.css?v=sparks-v4.5.0">
   </head>
   <body>
     <canvas id="particle-canvas" aria-hidden="true"></canvas>
@@ -27,11 +27,11 @@
         <span>S-parks</span>
       </a>
 
-      <button class="icon-button mobile-menu-button" type="button" aria-label="打开导航" aria-expanded="false" data-menu-button>
+      <button class="icon-button mobile-menu-button" type="button" aria-label="打开导航" aria-expanded="false" aria-controls="site-nav" data-menu-button>
         <span class="material-symbols-outlined" aria-hidden="true">menu</span>
       </button>
 
-      <nav class="site-nav" aria-label="主导航" data-site-nav></nav>
+      <nav id="site-nav" class="site-nav" aria-label="主导航" data-site-nav></nav>
 
       <div class="header-actions">
         <label class="search-shell" aria-label="搜索 S-parks 内容">
@@ -62,11 +62,11 @@
       </nav>
     </footer>
 
-    <script src="./assets/js/content.js?v=sparks-v4.1"></script>
-    <script src="./assets/js/utils.js?v=sparks-v4.1"></script>
-    <script src="./assets/js/renderers.js?v=sparks-v4.1"></script>
-    <script src="./assets/js/router.js?v=sparks-v4.1"></script>
-    <script src="./assets/js/particles.js?v=sparks-v4.1"></script>
-    <script src="./assets/js/app.js?v=sparks-v4.1"></script>
+    <script src="./assets/js/content.js?v=sparks-v4.5.0"></script>
+    <script src="./assets/js/utils.js?v=sparks-v4.5.0"></script>
+    <script src="./assets/js/renderers.js?v=sparks-v4.5.0"></script>
+    <script src="./assets/js/router.js?v=sparks-v4.5.0"></script>
+    <script src="./assets/js/particles.js?v=sparks-v4.5.0"></script>
+    <script src="./assets/js/app.js?v=sparks-v4.5.0"></script>
   </body>
 </html>
