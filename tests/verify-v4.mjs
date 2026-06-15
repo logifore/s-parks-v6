@@ -121,6 +121,52 @@ function checkV45Interactions(renderers, content, state, css, appSource) {
   assert(appSource.includes(".inert"), "移动导航缺少 inert 焦点隔离");
 }
 
+function checkRoleProfileLayouts(renderers, content, state, css) {
+  const signedUserHtml = renderers.account(content, {
+    ...state,
+    signedIn: true,
+    authProfile: {
+      displayName: "测试用户",
+      email: "user@sparks.local",
+      role: "user",
+      avatarUrl: ""
+    }
+  });
+  const adminHtml = renderers.admin(content, {
+    ...state,
+    signedIn: true,
+    reviewDecisions: {},
+    authProfile: {
+      displayName: "Admin",
+      email: "admin@sparks.local",
+      role: "admin",
+      avatarUrl: ""
+    }
+  });
+  const ownerCreatorHtml = renderers.creator(content, {
+    ...state,
+    signedIn: true,
+    activeCreatorId: "marcus-thorne",
+    creatorTab: "works",
+    authProfile: {
+      displayName: "Marcus",
+      email: "marcus@sparks.local",
+      role: "creator",
+      creatorId: "marcus-thorne",
+      avatarUrl: ""
+    }
+  });
+
+  assert(signedUserHtml.includes("profile-overview-user"), "普通用户主页缺少新版双栏概览");
+  assert(signedUserHtml.includes("profile-identity-card"), "普通用户主页缺少身份主卡片");
+  assert(adminHtml.includes("profile-overview-admin"), "管理员主页缺少新版概览结构");
+  assert(adminHtml.includes("admin-spotlight-card"), "管理员主页缺少审核摘要聚焦卡");
+  assert(ownerCreatorHtml.includes("creator-stat-card"), "创作者主页缺少统一统计卡");
+  assert(css.includes(".profile-overview"), "角色主页缺少统一概览布局样式");
+  assert(css.includes(".profile-surface-card-dark"), "深色角色卡片对比度样式缺失");
+  assert(css.includes(".creator-stat-card-light"), "浅色创作者统计卡样式缺失");
+}
+
 function main() {
   const { content, renderers } = loadRuntime();
   const css = fs.readFileSync(cssPath, "utf8");
@@ -146,8 +192,9 @@ function main() {
   checkCreatorVariants(renderers, content, state);
   checkOnboarding(renderers, content, state);
   checkV45Interactions(renderers, content, state, css, appSource);
+  checkRoleProfileLayouts(renderers, content, state, css);
 
-  console.log("verify-v4.5: ok");
+  console.log("verify-v5: ok");
 }
 
 main();

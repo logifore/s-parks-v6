@@ -4,6 +4,7 @@
   const content = window.SPARKS_CONTENT;
   const router = window.SparksRouter;
   const particles = window.SparksParticles;
+  const authClient = window.SparksAuth;
   const { escapeHtml } = window.SparksUtils;
   const assetIds = new Set(content.assets.items.map((item) => item.id));
   const creatorIds = new Set(Object.keys(content.creators));
@@ -34,6 +35,10 @@
 
   function cloneDownloadQueue() {
     return cloneValue(content.downloads.queue);
+  }
+
+  function cloneReviewItems() {
+    return cloneValue(content.flows.admin.reviewItems || []);
   }
 
   function normalizeFilterCategory(category) {
@@ -77,10 +82,21 @@
     uploadStatus: "草稿未提交",
     uploadStep: 0,
     signedIn: false,
+    authConfigured: authClient.isConfigured(),
+    authMode: authClient.getMode(),
+    authBusy: false,
+    authError: "",
+    authReady: false,
+    authSession: null,
+    authProfile: null,
+    currentUser: null,
+    profileHomeHref: "#account",
     licensePurchased: false,
     selectedPlan: "Trial",
     creatorTab: "works",
     reviewDecisions: {},
+    reviewItems: cloneReviewItems(),
+    reviewBusy: false,
     detailAssetId: DEFAULT_ASSET_ID,
     activeCreatorId: DEFAULT_CREATOR_ID,
     activeProjectId: DEFAULT_PROJECT_ID,
@@ -106,9 +122,7 @@
     if (!project) return;
     const total = Math.max(project.assets.length + (projectId === "wishlist" ? 0 : 3), project.assets.length);
     const purchased = project.assets.filter((entry) => entry.state === "已购").length;
-    const missing = project.assets.filter((entry) => entry.state !== "已购").map((entry) => {
-      return getAssetById(entry.assetId).name;
-    });
+    const missing = project.assets.filter((entry) => entry.state !== "已购").map((entry) => getAssetById(entry.assetId).name);
     project.stats = [
       { label: "已收集素材", value: `${project.assets.length} / ${total}` },
       { label: "已购完成度", value: `${Math.round((purchased / Math.max(project.assets.length, 1)) * 100)}%` },
@@ -144,6 +158,46 @@
     recomputePendingPurchaseCount();
   }
 
+  function getCurrentRole() {
+    return state.authProfile ? state.authProfile.role : "guest";
+  }
+
+  function getProfileHomeDestination(profile = state.authProfile) {
+    if (!profile) return { route: "auth", params: "" };
+    if (profile.role === "admin") return { route: "admin", params: "" };
+    if (profile.role === "creator") {
+      const creatorId = isKnownCreator(profile.creatorId) ? profile.creatorId : DEFAULT_CREATOR_ID;
+      return { route: "creator", params: { creator: creatorId, tab: state.creatorTab || "works" } };
+    }
+    return { route: "account", params: "" };
+  }
+
+  function syncProfileHomeHref() {
+    const destination = getProfileHomeDestination();
+    state.profileHomeHref = router.hrefFor(destination.route, destination.params);
+  }
+
+  function applyAuthResult(result) {
+    state.authSession = result.session;
+    state.currentUser = result.user;
+    state.authProfile = result.profile;
+    state.signedIn = true;
+    state.authError = "";
+    if (result.profile && result.profile.role === "creator" && isKnownCreator(result.profile.creatorId)) {
+      state.activeCreatorId = result.profile.creatorId;
+    }
+    syncProfileHomeHref();
+  }
+
+  function clearAuthState() {
+    state.authSession = null;
+    state.currentUser = null;
+    state.authProfile = null;
+    state.signedIn = false;
+    state.authError = "";
+    syncProfileHomeHref();
+  }
+
   function syncRouteState() {
     state.route = router.routeFromHash();
     const params = router.paramsFromHash();
@@ -171,8 +225,40 @@
     }
   }
 
+  function redirectToProfileHome(message) {
+    const destination = getProfileHomeDestination();
+    if (message) showToast(message);
+    goToRoute(destination.route, destination.params);
+  }
+
+  function enforceRouteAccess() {
+    const role = getCurrentRole();
+    if (state.route === "account" && !state.signedIn) {
+      goToRoute("auth");
+      return true;
+    }
+    if (state.route === "account" && role === "creator") {
+      goToRoute("creator", { creator: state.authProfile.creatorId || DEFAULT_CREATOR_ID, tab: state.creatorTab || "works" });
+      return true;
+    }
+    if (state.route === "account" && role === "admin") {
+      goToRoute("admin");
+      return true;
+    }
+    if (state.route === "admin" && !state.signedIn) {
+      goToRoute("auth");
+      return true;
+    }
+    if (state.route === "admin" && role !== "admin") {
+      redirectToProfileHome("当前账号没有管理员权限");
+      return true;
+    }
+    return false;
+  }
+
   recomputeProjectDerivedState();
   recomputeDownloadSummary();
+  syncProfileHomeHref();
 
   const app = document.getElementById("app");
   const header = document.querySelector(".site-header");
@@ -181,6 +267,7 @@
   const menuButton = document.querySelector("[data-menu-button]");
   const headerActions = document.querySelector(".header-actions");
   const searchInput = document.getElementById("site-search");
+  const profileLink = document.querySelector("[data-profile-link]");
   const siteFooter = document.querySelector(".site-footer");
   let creatorMenuCloseTimer = 0;
   let lastMenuFocusTarget = null;
@@ -234,14 +321,10 @@
     if (state.menuOpen && isMobileViewport()) {
       lastMenuFocusTarget = document.activeElement instanceof HTMLElement ? document.activeElement : menuButton;
     }
-    if (!state.menuOpen) {
-      state.creatorMenuOpen = false;
-    }
+    if (!state.menuOpen) state.creatorMenuOpen = false;
     document.body.dataset.menuOpen = String(state.menuOpen);
     syncMobileModalState();
-    if (state.menuOpen && isMobileViewport()) {
-      window.requestAnimationFrame(focusFirstMenuItem);
-    }
+    if (state.menuOpen && isMobileViewport()) window.requestAnimationFrame(focusFirstMenuItem);
     if (wasOpen && !state.menuOpen && isMobileViewport()) {
       window.requestAnimationFrame(() => {
         (lastMenuFocusTarget || menuButton).focus({ preventScroll: true });
@@ -295,7 +378,7 @@
   }
 
   function currentPageTone() {
-    if (state.route === "community" || state.route === "account" || state.route === "creator-onboarding") {
+    if (state.route === "community" || state.route === "account" || state.route === "creator-onboarding" || state.route === "admin" || state.route === "auth") {
       return "light";
     }
     if (state.route === "creator") {
@@ -306,6 +389,7 @@
 
   function render(focusMain = false) {
     syncRouteState();
+    if (enforceRouteAccess()) return;
     setMenuOpen(false);
     document.body.dataset.route = state.route;
     document.body.dataset.pageTone = currentPageTone();
@@ -323,6 +407,12 @@
     updateSearchField();
     updateChrome();
     if (message) showToast(message);
+  }
+
+  function updateProfileLink() {
+    if (!profileLink) return;
+    profileLink.setAttribute("href", state.profileHomeHref);
+    profileLink.setAttribute("aria-label", state.signedIn ? "进入我的主页" : "登录或进入个人主页");
   }
 
   function updateChrome() {
@@ -344,6 +434,7 @@
     if (creatorTrigger) creatorTrigger.setAttribute("aria-expanded", String(state.creatorMenuOpen));
     if (creatorMenuToggle) creatorMenuToggle.setAttribute("aria-expanded", String(state.creatorMenuOpen));
     header.dataset.elevated = String(window.scrollY > 8);
+    updateProfileLink();
     syncMobileModalState();
   }
 
@@ -369,7 +460,94 @@
     }
   }
 
-  function handleAction(target) {
+  async function refreshAdminQueue(showFeedback = false) {
+    if (!state.signedIn || getCurrentRole() !== "admin" || !state.authConfigured) {
+      if (showFeedback) showToast("当前使用本地审核列表");
+      return;
+    }
+    state.reviewBusy = true;
+    try {
+      const items = await authClient.fetchReviewItems(state.authSession.access_token);
+      if (items.length) state.reviewItems = items;
+      if (showFeedback) showToast("审核队列已刷新");
+    } catch (error) {
+      if (showFeedback) showToast(error.message || "刷新审核队列失败");
+    } finally {
+      state.reviewBusy = false;
+      rerender();
+    }
+  }
+
+  async function handleSignOut() {
+    state.authBusy = true;
+    try {
+      await authClient.signOut(state.authSession ? state.authSession.access_token : "");
+    } finally {
+      clearAuthState();
+      state.authBusy = false;
+      goToRoute("auth");
+      showToast("已退出登录");
+    }
+  }
+
+  async function handleAuthSubmit(form) {
+    if (state.authBusy) return;
+    const formData = new window.FormData(form);
+    const identifier = String(formData.get("identifier") || "").trim();
+    const password = String(formData.get("password") || "");
+
+    if (!identifier || !password) {
+      state.authError = "请输入账号和密码。";
+      rerender();
+      return;
+    }
+
+    if (!state.authConfigured) {
+      state.authError = "当前登录能力未启用。";
+      rerender();
+      return;
+    }
+
+    state.authBusy = true;
+    state.authError = "";
+    rerender();
+    try {
+      const result = await authClient.signIn(identifier, password);
+      applyAuthResult(result);
+      state.authReady = true;
+      if (getCurrentRole() === "admin") {
+        await refreshAdminQueue(false);
+      }
+      const destination = getProfileHomeDestination(result.profile);
+      goToRoute(destination.route, destination.params);
+      showToast("登录成功");
+    } catch (error) {
+      state.authError = error.message || "登录失败，请检查账号密码。";
+      rerender();
+    } finally {
+      state.authBusy = false;
+      rerender();
+    }
+  }
+
+  async function updateReviewDecision(id, nextStatus) {
+    state.reviewDecisions[id] = nextStatus;
+    const index = state.reviewItems.findIndex((item) => item.id === id);
+    if (index >= 0) state.reviewItems[index].status = nextStatus;
+
+    if (state.authConfigured && getCurrentRole() === "admin" && state.authSession) {
+      try {
+        const updated = await authClient.updateReviewStatus(id, nextStatus, state.authSession.access_token);
+        if (index >= 0) state.reviewItems[index] = updated;
+      } catch (error) {
+        showToast(error.message || "同步审核状态失败，已保留本地变更");
+      }
+    }
+
+    rerender(`${id} ${nextStatus}`);
+  }
+
+  async function handleAction(target) {
     const action = target.dataset.action;
     if (!action) return;
 
@@ -470,9 +648,8 @@
       return;
     }
 
-    if (action === "mock-login") {
-      state.signedIn = true;
-      rerender("已进入原型账户状态");
+    if (action === "sign-out") {
+      await handleSignOut();
       return;
     }
 
@@ -514,10 +691,23 @@
       return;
     }
 
-    if (action === "review-approve" || action === "review-reject") {
-      const id = target.dataset.id;
-      state.reviewDecisions[id] = action === "review-approve" ? "已通过" : "已驳回";
-      rerender(`${id} ${state.reviewDecisions[id]}`);
+    if (action === "refresh-admin-queue") {
+      await refreshAdminQueue(true);
+      return;
+    }
+
+    if (action === "review-approve") {
+      await updateReviewDecision(target.dataset.id, "已通过");
+      return;
+    }
+
+    if (action === "review-request-changes") {
+      await updateReviewDecision(target.dataset.id, "待补充");
+      return;
+    }
+
+    if (action === "review-reject") {
+      await updateReviewDecision(target.dataset.id, "已驳回");
     }
   }
 
@@ -528,9 +718,7 @@
     });
     window.addEventListener("scroll", updateChrome, { passive: true });
     window.addEventListener("resize", () => {
-      if (window.innerWidth > 920) {
-        setMenuOpen(false);
-      }
+      if (window.innerWidth > 920) setMenuOpen(false);
       updateChrome();
     }, { passive: true });
 
@@ -545,7 +733,6 @@
         event.preventDefault();
         event.stopPropagation();
         setCreatorMenuOpen(!state.creatorMenuOpen);
-        return;
       }
     });
 
@@ -590,14 +777,52 @@
 
     app.addEventListener("click", (event) => {
       const target = event.target.closest("[data-action]");
-      if (target) handleAction(target);
+      if (target) {
+        void handleAction(target);
+      }
     });
 
-    app.addEventListener("submit", (event) => event.preventDefault());
+    app.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const authForm = event.target.closest("[data-auth-form]");
+      if (authForm) {
+        void handleAuthSubmit(authForm);
+      }
+    });
   }
 
-  renderNav();
-  bindEvents();
-  particles.init(document.getElementById("particle-canvas"));
-  render(false);
+  async function initializeAuth() {
+    state.authConfigured = authClient.isConfigured();
+    state.authMode = authClient.getMode();
+    syncProfileHomeHref();
+    if (!state.authConfigured) {
+      state.authReady = true;
+      return;
+    }
+    try {
+      const result = await authClient.restoreSession();
+      if (result) {
+        applyAuthResult(result);
+        if (getCurrentRole() === "admin") {
+          await refreshAdminQueue(false);
+        }
+      }
+    } catch (error) {
+      state.authError = error.message || "恢复登录状态失败";
+    } finally {
+      state.authReady = true;
+      state.authBusy = false;
+      updateProfileLink();
+    }
+  }
+
+  async function bootstrap() {
+    renderNav();
+    bindEvents();
+    particles.init(document.getElementById("particle-canvas"));
+    await initializeAuth();
+    render(false);
+  }
+
+  void bootstrap();
 })();

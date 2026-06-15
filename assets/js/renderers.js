@@ -26,11 +26,12 @@ window.SparksRenderers = ((utils) => {
     }
   };
 
-  const reviewItems = [
-    { id: "SP-2048", title: "武士三视图", owner: "LogiFore", risk: "版权声明完整", status: "待审核" },
-    { id: "SP-2049", title: "日落河边场景组", owner: "LogiFore", risk: "需补充模型来源", status: "复核" },
-    { id: "SP-2050", title: "汉人服装造型", owner: "Aria Jin", risk: "标签不足", status: "待补充" }
-  ];
+  const ROLE_LABELS = {
+    guest: "游客",
+    user: "普通用户",
+    creator: "创作者",
+    admin: "管理员"
+  };
 
   function getAssetById(assetId) {
     return content.assets.items.find((item) => item.id === assetId) || DEFAULT_ASSET;
@@ -42,6 +43,42 @@ window.SparksRenderers = ((utils) => {
 
   function getProjectById(projects, projectId) {
     return projects[projectId] || projects[DEFAULT_PROJECT_ID];
+  }
+
+  function getAuthProfile(state) {
+    return state.authProfile || null;
+  }
+
+  function getRoleLabel(role) {
+    return ROLE_LABELS[role] || ROLE_LABELS.user;
+  }
+
+  function isCreatorOwner(state, creatorId) {
+    const profile = getAuthProfile(state);
+    return Boolean(state.signedIn && profile && profile.role === "creator" && profile.creatorId === creatorId);
+  }
+
+  function isAdminViewer(state) {
+    const profile = getAuthProfile(state);
+    return Boolean(state.signedIn && profile && profile.role === "admin");
+  }
+
+  function roleStatusText(role) {
+    const map = {
+      guest: "未登录",
+      user: "普通会员",
+      creator: "签约创作者",
+      admin: "平台管理员"
+    };
+    return map[role] || "普通会员";
+  }
+
+  function renderProfileActions(extraClass = "") {
+    return `
+      <div class="profile-page-actions${extraClass ? ` ${extraClass}` : ""}">
+        <button class="button button-primary profile-page-exit" type="button" data-action="sign-out">${icon("logout")} 退出账号</button>
+      </div>
+    `;
   }
 
   function isAssetCollected(state, assetId) {
@@ -265,33 +302,81 @@ window.SparksRenderers = ((utils) => {
   }
 
   function renderAccount(state) {
+    if (!state.signedIn) {
+      return pageShell("个人主页", "登录后查看个人主页", "普通用户主页", `
+        <section class="account-shell">
+          <section class="profile-overview profile-overview-guest">
+            <article class="profile-identity-card profile-surface-card">
+              <div class="profile-identity-main">
+                <div class="account-avatar">${image("https://lh3.googleusercontent.com/aida-public/AB6AXuBl8whoU5MlIADYjJiOYQoBI2AAqeaFfBwFyBKVOHXyic5TlVsXl26WlsWzTeXdwuO1x8D1goEHUbNzeojIxQ1UOjmVGu2G3zzRL85LLHsBXxMjOoIy22ZSwN1TShvPC5Xn6LsA2gjcGl3xvC-OUM28MqwfDsmH3g6eeKMtBTbM-30EOkGoV6UmAXaLDMO0OXMCgG7H5_cqd6SWR6IfqpGmPm2B0VwTWQMCiPY4E5U6SPrgJGo6BS6Le1nPBHTC8ieblPVKvdfL8jYd", "account", "account-avatar-image")}</div>
+                <div class="profile-identity-copy">
+                  <span class="eyebrow profile-kicker">Account Access</span>
+                  <h1>欢迎回来</h1>
+                  <p class="profile-identity-primary">登录后继续查看已购素材、项目夹和账号设置。</p>
+                  <div class="profile-identity-meta">
+                    <span class="account-badge">未登录</span>
+                    <span class="profile-meta-pill">游客模式</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <article class="account-creator-frame profile-surface-card profile-spotlight-card">
+              <span class="eyebrow">Account Access</span>
+              <h2>先登录再进入个人主页</h2>
+              <p>V5 已经切到真实账号登录，普通用户、创作者和管理员会进入各自对应的主页。</p>
+              <div class="account-entry-actions">
+                <a class="button button-primary" href="#auth">前往登录</a>
+                <a class="button button-ghost" href="#creator-onboarding">立即申请</a>
+                <a class="button button-ghost" href="#creator?creator=elena-voss">进入创作者主页</a>
+                <a class="button button-ghost" href="#assets">继续游客浏览</a>
+              </div>
+            </article>
+          </section>
+        </section>
+      `, "account-page");
+    }
+
+    const profile = getAuthProfile(state);
     const purchased = (state.downloadRecords || []).map((record) => getAssetById(record.assetId));
     const sample = (purchased.length ? purchased : [])
       .concat(content.assets.items.filter((asset) => !purchased.some((entry) => entry.id === asset.id)))
       .slice(0, 3);
-    return pageShell("个人主页", "陈思远", "普通会员", `
+    const displayName = (profile && profile.displayName) || "S-parks 用户";
+    const email = (profile && profile.email) || "未配置邮箱";
+    const role = (profile && profile.role) || "user";
+    return pageShell("个人主页", displayName, getRoleLabel(role), `
       <section class="account-shell">
-        <section class="account-hero">
-          <div class="account-avatar">${image("https://lh3.googleusercontent.com/aida-public/AB6AXuBl8whoU5MlIADYjJiOYQoBI2AAqeaFfBwFyBKVOHXyic5TlVsXl26WlsWzTeXdwuO1x8D1goEHUbNzeojIxQ1UOjmVGu2G3zzRL85LLHsBXxMjOoIy22ZSwN1TShvPC5Xn6LsA2gjcGl3xvC-OUM28MqwfDsmH3g6eeKMtBTbM-30EOkGoV6UmAXaLDMO0OXMCgG7H5_cqd6SWR6IfqpGmPm2B0VwTWQMCiPY4E5U6SPrgJGo6BS6Le1nPBHTC8ieblPVKvdfL8jYd", "account", "account-avatar-image")}</div>
-          <h1>陈思远</h1>
-          <p>siyuan.chen@example.com</p>
-          <span class="account-badge">普通会员</span>
-        </section>
-        <section class="account-creator-callout">
-          <div class="account-creator-frame">
+        <section class="profile-overview profile-overview-user">
+          <article class="profile-identity-card profile-surface-card">
+            <div class="profile-identity-main">
+              <div class="account-avatar">${image((profile && profile.avatarUrl) || "https://lh3.googleusercontent.com/aida-public/AB6AXuBl8whoU5MlIADYjJiOYQoBI2AAqeaFfBwFyBKVOHXyic5TlVsXl26WlsWzTeXdwuO1x8D1goEHUbNzeojIxQ1UOjmVGu2G3zzRL85LLHsBXxMjOoIy22ZSwN1TShvPC5Xn6LsA2gjcGl3xvC-OUM28MqwfDsmH3g6eeKMtBTbM-30EOkGoV6UmAXaLDMO0OXMCgG7H5_cqd6SWR6IfqpGmPm2B0VwTWQMCiPY4E5U6SPrgJGo6BS6Le1nPBHTC8ieblPVKvdfL8jYd", "account", "account-avatar-image")}</div>
+              <div class="profile-identity-copy">
+                <span class="eyebrow profile-kicker">${escapeHtml(getRoleLabel(role))}</span>
+                <h1>${escapeHtml(displayName)}</h1>
+                <p class="profile-identity-primary">${escapeHtml(email)}</p>
+                <div class="profile-identity-meta">
+                  <span class="account-badge">${escapeHtml(roleStatusText(role))}</span>
+                  <span class="profile-meta-pill">角色主页已启用</span>
+                </div>
+              </div>
+            </div>
+            ${renderProfileActions("profile-page-actions-inline")}
+          </article>
+          <article class="account-creator-frame profile-surface-card profile-spotlight-card">
             <span class="eyebrow">Creator Program</span>
             <h2>申请成为创作者</h2>
-            <p>把个人作品升级成可展示、可授权、可获得收益分成的创作者主页，并继续沿用当前站内的浏览与上传流程。</p>
+            <p>你现在使用的是真实账号登录。后续可继续把普通用户升级为创作者，沿用当前站内浏览、收藏和上传流程。</p>
             <div class="account-entry-actions">
               <a class="button button-primary" href="#creator-onboarding">立即申请</a>
               <a class="button button-ghost" href="#creator?creator=elena-voss">进入创作者主页</a>
+              <a class="button button-ghost" href="#collections">查看项目夹</a>
             </div>
-          </div>
+          </article>
         </section>
         <section class="account-summary">
           <article class="account-panel">
             <div class="account-panel-head">${icon("account_balance_wallet")}<h2>账户余额</h2></div>
-            <strong>￥120.00</strong>
+            <strong>${escapeHtml(`￥${(state.pointsBalance / 100).toFixed(2)}`)}</strong>
             <a class="button button-primary compact" href="#membership">充值</a>
           </article>
           <article class="account-panel">
@@ -314,10 +399,14 @@ window.SparksRenderers = ((utils) => {
         <section class="account-settings">
           <div class="section-title"><h2>设置与隐私</h2></div>
           <div class="account-settings-list">
-            ${["个人资料设置", "账号安全与密码", "账单与发票管理", "退出登录"].map((item, index) => `
-              <article class="account-settings-row ${index === 3 ? "danger" : ""}">
+            ${[
+              "个人资料设置",
+              "账号安全与密码",
+              "账单与发票管理"
+            ].map((item) => `
+              <article class="account-settings-row">
                 <span>${escapeHtml(item)}</span>
-                ${index === 3 ? "" : icon("chevron_right")}
+                ${icon("chevron_right")}
               </article>
             `).join("")}
           </div>
@@ -445,7 +534,7 @@ window.SparksRenderers = ((utils) => {
         <div class="section-title">
           <span class="eyebrow">Scene Variants</span>
           <h2>时间切换和构图一致性继续保留，并升级成更像精选陈列</h2>
-          <p>原版的场景切换能力继续可用，V4.5 这一轮重点重做筛选反馈、阅读顺序和信息密度。</p>
+          <p>原版的场景切换能力继续可用，V5 这一轮重点加入角色登录结构、管理员工作台和更完整的账号分流体验。</p>
         </div>
         <div class="scene-grid">
           ${assets.scenes.map((scene) => `<article class="glass-panel scene-card"><h3>${escapeHtml(scene.name)}</h3><p>${escapeHtml(scene.meta)}</p></article>`).join("")}
@@ -654,6 +743,34 @@ window.SparksRenderers = ((utils) => {
     const creatorId = state.activeCreatorId || DEFAULT_CREATOR_ID;
     const creator = getCreatorById(creatorId);
     const tab = state.creatorTab || "works";
+    const ownerView = isCreatorOwner(state, creatorId);
+    const ownerBanner = ownerView ? `
+      <section class="glass-panel creator-owner-banner">
+        <div>
+          <span class="eyebrow">Creator Workspace</span>
+          <h2>这是你的创作者主页</h2>
+          <p>V5 会在保留原主页视觉的前提下，把上传、收益、审核状态和作品管理整合进来。</p>
+        </div>
+        <div class="creator-owner-grid">
+          <article>
+            <span>待审核</span>
+            <strong>4 个素材</strong>
+          </article>
+          <article>
+            <span>本月收益</span>
+            <strong>￥18,600</strong>
+          </article>
+          <article>
+            <span>草稿箱</span>
+            <strong>${escapeHtml(state.uploadStatus || "草稿未提交")}</strong>
+          </article>
+        </div>
+        <div class="creator-owner-actions">
+          <a class="button button-primary" href="#upload">${icon("upload")} 上传新作品</a>
+          <a class="button button-ghost" href="#downloads">${icon("download")} 查看收益与下载</a>
+        </div>
+      </section>
+    ` : "";
     if (creatorId === "marcus-thorne") {
       const body = `
       <section class="creator-shell">
@@ -662,29 +779,34 @@ window.SparksRenderers = ((utils) => {
             ${image(creator.image, creator.name, "creator-hero-avatar-image")}
           </div>
           <div class="creator-hero-copy">
+            <span class="eyebrow profile-kicker">Creator Archive</span>
             <h1>${escapeHtml(creator.name)}</h1>
             <p>${escapeHtml(creator.bio)}</p>
             <div class="creator-hero-stats">
               ${Object.entries(creator.stats).map(([label, value]) => `
-                <div>
+                <article class="creator-stat-card creator-stat-card-dark">
                   <strong>${escapeHtml(value)}</strong>
                   <span>${escapeHtml(label)}</span>
-                </div>
+                </article>
               `).join("")}
             </div>
           </div>
           <div class="creator-hero-actions">
-            <a class="button button-ghost" href="#upload">设置</a>
-            <a class="button button-ghost" href="#support">分享</a>
+            <a class="button button-ghost" href="${ownerView ? "#upload" : "#support"}">${ownerView ? "作品设置" : "分享"}</a>
+            <a class="button button-ghost" href="${ownerView ? "#downloads" : "#support"}">${ownerView ? "收益中心" : "联系"}</a>
           </div>
         </header>
 
+        ${ownerView ? renderProfileActions() : ""}
+        ${ownerBanner}
+
         <section class="creator-tools-banner">
           <div>
-            <h2>Unlock Studio Tools</h2>
-            <p>Join the creator program to access advanced rendering nodes, commercial licensing, and monetization features.</p>
+            <span class="eyebrow profile-kicker">${ownerView ? "Workspace Ready" : "Creator Upgrade"}</span>
+            <h2>${ownerView ? "你的工作台已启用" : "Unlock Studio Tools"}</h2>
+            <p>${ownerView ? "继续沿用你原本的创作者主页风格，同时把上传、审核与收益入口放进同一页面。" : "Join the creator program to access advanced rendering nodes, commercial licensing, and monetization features."}</p>
           </div>
-          <a class="button button-primary" href="#upload">成为创作者</a>
+          <a class="button button-primary" href="${ownerView ? "#upload" : "#creator-onboarding"}">${ownerView ? "继续上传" : "成为创作者"}</a>
         </section>
 
         <nav class="creator-tabs-v4" aria-label="创作者内容切换">
@@ -722,6 +844,7 @@ window.SparksRenderers = ((utils) => {
           <header class="creator-studio-hero">
             <div class="creator-studio-avatar">${image(creator.image, creator.name, "creator-studio-avatar-image")}</div>
             <div class="creator-studio-copy">
+              <span class="eyebrow profile-kicker">Creator Studio</span>
               <h1>${escapeHtml(creator.name)}</h1>
               <p>${escapeHtml(creator.bio)}</p>
               <div class="chips">${creator.focus.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
@@ -731,13 +854,15 @@ window.SparksRenderers = ((utils) => {
               <a class="button button-ghost" href="#downloads">${icon("payments")} 收益中心</a>
             </div>
           </header>
+          ${ownerView ? renderProfileActions() : ""}
+          ${ownerBanner}
           <div class="creator-studio-metrics">
             ${[
               ["总浏览量", "1.2M"],
               ["作品下载量", "34.5K"],
               ["关注者", "12.8K"],
               ["累计收益", "￥89,400"]
-            ].map(([label, value]) => `<article><span>${label}</span><strong>${value}</strong></article>`).join("")}
+            ].map(([label, value]) => `<article class="creator-metric-card"><span>${label}</span><strong>${value}</strong></article>`).join("")}
           </div>
           <nav class="creator-studio-tabs" aria-label="Creator workspace tabs">
             <button class="${tab === "works" ? "active" : ""}" type="button" ${pressedAttr(tab === "works")} data-action="set-creator-tab" data-tab="works">My Works</button>
@@ -759,17 +884,20 @@ window.SparksRenderers = ((utils) => {
         <header class="creator-gallery-hero">
           <div class="creator-gallery-avatar">${image(creator.image, creator.name, "creator-gallery-avatar-image")}</div>
           <div class="creator-gallery-copy">
+            <span class="eyebrow profile-kicker">Curated Portfolio</span>
             <h1>${escapeHtml(creator.name)}</h1>
             <p>${escapeHtml(creator.role)} · Stockholm, SE</p>
             <div class="creator-gallery-actions">
-              <a class="button button-ghost" href="#support">Contact</a>
-              <a class="button button-primary" href="#collections">Follow</a>
-              <a class="icon-button" href="#support" aria-label="分享">${icon("share")}</a>
+              <a class="button button-ghost" href="${ownerView ? "#upload" : "#support"}">${ownerView ? "管理作品" : "Contact"}</a>
+              <a class="button button-primary" href="${ownerView ? "#downloads" : "#collections"}">${ownerView ? "收益中心" : "Follow"}</a>
+              <a class="icon-button" href="${ownerView ? "#collections" : "#support"}" aria-label="${ownerView ? "进入收藏" : "分享"}">${icon(ownerView ? "folder_special" : "share")}</a>
             </div>
           </div>
         </header>
+        ${ownerView ? renderProfileActions() : ""}
+        ${ownerBanner}
         <div class="creator-gallery-stats">
-          ${Object.entries(creator.stats).map(([label, value]) => `<div><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("")}
+          ${Object.entries(creator.stats).map(([label, value]) => `<article class="creator-stat-card creator-stat-card-light"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></article>`).join("")}
         </div>
         <nav class="creator-gallery-tabs" aria-label="创作者内容切换">
           <button class="${tab === "works" ? "active" : ""}" type="button" ${pressedAttr(tab === "works")} data-action="set-creator-tab" data-tab="works">个人作品</button>
@@ -824,10 +952,66 @@ window.SparksRenderers = ((utils) => {
   function renderAuth(appContent, state) {
     const auth = appContent.flows.auth;
     const signedIn = state.signedIn;
+    const configured = state.authConfigured;
+    const busy = state.authBusy;
+    const error = state.authError;
+    const profile = getAuthProfile(state);
+    const homeRoute = state.profileHomeHref || "#account";
+    const authMode = state.authMode || "none";
     const body = `
       <div class="auth-grid">
-        <article class="glass-panel auth-card"><h2>${signedIn ? "已进入原型账户" : "登录"}</h2><input placeholder="邮箱"><input placeholder="密码" type="password"><button class="button button-primary" type="button" data-action="mock-login">${signedIn ? "已登录" : "进入原型"}</button></article>
-        <article class="glass-panel auth-card"><h2>注册路径</h2>${auth.steps.map((step) => `<p>${icon("check_circle")} ${escapeHtml(step)}</p>`).join("")}</article>
+        <article class="glass-panel auth-card auth-card-primary">
+          <div class="auth-card-shell">
+            <header class="auth-card-head">
+              <span class="eyebrow">Account Access</span>
+              <h2>${signedIn ? "当前已登录" : "登录注册"}</h2>
+              <p>${signedIn ? "你已经接入当前角色主页，可直接进入个人空间继续操作。" : "继续沿用现有页面结构，只把账号校验、角色分流和主页入口接到真实流程里。"}</p>
+            </header>
+            ${signedIn ? `
+              <div class="auth-status-block">
+                <strong>${escapeHtml(profile ? profile.displayName : "S-parks 用户")}</strong>
+                <p>${escapeHtml(profile ? profile.email : "")}</p>
+                <span class="account-badge">${escapeHtml(roleStatusText(profile ? profile.role : "user"))}</span>
+              </div>
+              <div class="auth-actions">
+                <a class="button button-primary" href="${escapeHtml(homeRoute)}">进入我的主页</a>
+                <button class="button button-ghost" type="button" data-action="sign-out">退出登录</button>
+              </div>
+            ` : `
+              <form class="auth-form" data-auth-form>
+                <input name="identifier" type="text" placeholder="账号或邮箱" autocomplete="username">
+                <input name="password" placeholder="密码" type="password" autocomplete="current-password">
+                <button class="button button-primary" type="submit" ${busy ? "disabled" : ""}>${busy ? "登录中..." : "登录进入主页"}</button>
+              </form>
+              ${error ? `<p class="auth-message auth-message-error">${escapeHtml(error)}</p>` : ""}
+              ${configured ? `
+                <p class="auth-message">登录成功后会根据账号角色进入普通用户、创作者或管理员主页。</p>
+                ${authMode === "local" ? `<p class="auth-message auth-message-warning">当前正在使用本地开发测试账号模式。部署到公开站点前应切换到真实 Supabase 配置。</p>` : ""}
+              ` : `<p class="auth-message auth-message-warning">当前未启用任何登录配置。</p>`}
+            `}
+          </div>
+        </article>
+        <article class="glass-panel auth-card auth-card-secondary">
+          <div class="auth-card-shell">
+            <header class="auth-card-head">
+              <span class="eyebrow">Role Routing</span>
+              <h2>登录后会发生什么</h2>
+              <p>账号会先完成身份识别，再把你导向对应的角色主页，保持原有浏览动线不被打断。</p>
+            </header>
+            <div class="auth-step-list">
+              ${auth.steps.map((step) => `
+                <p class="auth-step-item">
+                  ${icon("check_circle")}
+                  <span>${escapeHtml(step)}</span>
+                </p>
+              `).join("")}
+            </div>
+            <div class="auth-card-note">
+              <strong>当前方案</strong>
+              <p>保留原本登录页 UI，不重做页面，只把原型按钮改成真实账号校验和角色分流。</p>
+            </div>
+          </div>
+        </article>
       </div>
     `;
     return pageShell("登录注册", auth.title, auth.subtitle, body, "auth-page");
@@ -925,16 +1109,147 @@ window.SparksRenderers = ((utils) => {
 
   function renderAdmin(appContent, state) {
     const flow = appContent.flows.admin;
+    if (!state.signedIn) {
+      return pageShell("管理员主页", flow.title, "需要登录", `
+        <section class="account-shell">
+          <section class="account-hero">
+            <h1>管理员主页需要登录</h1>
+            <p>请先使用管理员账号登录，再进入审核主页。</p>
+            <div class="account-entry-actions">
+              <a class="button button-primary" href="#auth">前往登录</a>
+            </div>
+          </section>
+        </section>
+      `, "admin-page");
+    }
+
+    if (!isAdminViewer(state)) {
+      return pageShell("管理员主页", "当前账号无权限", "仅管理员可访问", `
+        <section class="account-shell">
+          <section class="account-creator-callout">
+            <div class="account-creator-frame">
+              <span class="eyebrow">Access Control</span>
+              <h2>当前账号没有管理员权限</h2>
+              <p>V5 已加上角色权限控制。普通用户和创作者不能进入管理员主页。</p>
+              <div class="account-entry-actions">
+                <a class="button button-primary" href="${escapeHtml(state.profileHomeHref || "#account")}">返回我的主页</a>
+              </div>
+            </div>
+          </section>
+        </section>
+      `, "admin-page");
+    }
+
+    const profile = getAuthProfile(state);
+    const reviews = (state.reviewItems && state.reviewItems.length ? state.reviewItems : flow.reviewItems).map((item) => ({
+      ...item,
+      status: state.reviewDecisions[item.id] || item.status
+    }));
+    const stats = {
+      pending: reviews.filter((item) => item.status === "待审核").length,
+      revise: reviews.filter((item) => item.status === "待补充").length,
+      approved: reviews.filter((item) => item.status === "已通过").length,
+      recheck: reviews.filter((item) => item.status === "复核中").length
+    };
     const body = `
-      <div class="admin-grid">${flow.queue.map((item) => `<article class="glass-panel admin-card"><h2>${escapeHtml(item)}</h2><p>点击进入审核列表，正式版需接权限系统。</p></article>`).join("")}</div>
-      <div class="review-table glass-panel">
-        ${reviewItems.map((item) => {
-          const decision = state.reviewDecisions[item.id] || item.status;
-          return `<article class="review-row"><div><span>${escapeHtml(item.id)}</span><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.owner)} · ${escapeHtml(item.risk)}</p></div><strong>${escapeHtml(decision)}</strong><div><button class="button button-ghost compact" type="button" data-action="review-approve" data-id="${escapeHtml(item.id)}">通过</button><button class="button button-ghost compact" type="button" data-action="review-reject" data-id="${escapeHtml(item.id)}">驳回</button></div></article>`;
-        }).join("")}
-      </div>
+      <section class="admin-shell-v5">
+        <section class="profile-overview profile-overview-admin">
+          <article class="profile-identity-card profile-surface-card profile-surface-card-dark">
+            <div class="profile-identity-main">
+              <div class="account-avatar">${image((profile && profile.avatarUrl) || "https://lh3.googleusercontent.com/aida-public/AB6AXuBl8whoU5MlIADYjJiOYQoBI2AAqeaFfBwFyBKVOHXyic5TlVsXl26WlsWzTeXdwuO1x8D1goEHUbNzeojIxQ1UOjmVGu2G3zzRL85LLHsBXxMjOoIy22ZSwN1TShvPC5Xn6LsA2gjcGl3xvC-OUM28MqwfDsmH3g6eeKMtBTbM-30EOkGoV6UmAXaLDMO0OXMCgG7H5_cqd6SWR6IfqpGmPm2B0VwTWQMCiPY4E5U6SPrgJGo6BS6Le1nPBHTC8ieblPVKvdfL8jYd", "admin", "account-avatar-image")}</div>
+              <div class="profile-identity-copy">
+                <span class="eyebrow profile-kicker">Admin Control</span>
+                <h1>${escapeHtml(profile ? profile.displayName : "平台管理员")}</h1>
+                <p class="profile-identity-primary">${escapeHtml(profile ? profile.email : "")}</p>
+                <div class="profile-identity-meta">
+                  <span class="account-badge">平台管理员</span>
+                  <span class="profile-meta-pill">审核权限已启用</span>
+                </div>
+              </div>
+            </div>
+            ${renderProfileActions("profile-page-actions-inline")}
+          </article>
+          <article class="profile-surface-card profile-surface-card-dark profile-spotlight-card admin-spotlight-card">
+            <span class="eyebrow">Moderation Pulse</span>
+            <h2>把审核动作收进同一条阅读链路</h2>
+            <p>这一版优先把待审核、待补充、复核与已通过状态对齐到同一套版式和操作区，减少审核时的视觉跳跃。</p>
+            <div class="profile-meta-grid">
+              <article>
+                <span>待审核</span>
+                <strong>${stats.pending} 个</strong>
+              </article>
+              <article>
+                <span>复核中</span>
+                <strong>${stats.recheck} 个</strong>
+              </article>
+            </div>
+          </article>
+        </section>
+
+        <section class="account-summary">
+          ${[
+            ["待审核素材", `${stats.pending} 个`, "优先处理新提交素材"],
+            ["待补充资料", `${stats.revise} 个`, "继续追踪版权与标签缺口"],
+            ["本轮已通过", `${stats.approved} 个`, "保持审核节奏稳定"],
+            ["版权复核", `${stats.recheck} 个`, "聚焦高风险条目"]
+          ].map(([title, value, text]) => `
+            <article class="account-panel">
+              <div class="account-panel-head">${icon("shield")}<h2>${escapeHtml(title)}</h2></div>
+              <strong>${escapeHtml(value)}</strong>
+              <p>${escapeHtml(text)}</p>
+            </article>
+          `).join("")}
+        </section>
+
+        <section class="admin-toolbar">
+          <div class="section-title">
+            <h2>审核工作台</h2>
+            <p>沿用个人主页的阅读节奏，把审核动作收进同一页面完成。</p>
+          </div>
+          <div class="account-entry-actions">
+            <button class="button button-ghost" type="button" data-action="refresh-admin-queue">刷新队列</button>
+          </div>
+        </section>
+
+        <section class="admin-review-list">
+          ${reviews.map((item) => `
+            <article class="glass-panel admin-review-card">
+              <div class="admin-review-copy">
+                <span class="eyebrow">${escapeHtml(item.id)} · ${escapeHtml(item.category || "素材审核")}</span>
+                <h3>${escapeHtml(item.title)}</h3>
+                <p>${escapeHtml(item.owner)} · ${escapeHtml(item.risk)}</p>
+              </div>
+              <div class="admin-review-side">
+                <strong class="admin-status-chip">${escapeHtml(item.status)}</strong>
+                <div class="admin-review-actions">
+                  <button class="button button-ghost compact" type="button" data-action="review-approve" data-id="${escapeHtml(item.id)}">通过</button>
+                  <button class="button button-ghost compact" type="button" data-action="review-request-changes" data-id="${escapeHtml(item.id)}">待补充</button>
+                  <button class="button button-ghost compact" type="button" data-action="review-reject" data-id="${escapeHtml(item.id)}">驳回</button>
+                </div>
+              </div>
+            </article>
+          `).join("")}
+        </section>
+
+        <section class="account-settings">
+          <div class="section-title"><h2>审核准则速览</h2></div>
+          <div class="account-settings-list">
+            ${[
+              "优先检查素材版权来源是否完整",
+              "核对标签、风格和授权范围是否清晰",
+              "对高风险条目保留复核状态",
+              "所有管理员操作都应可继续扩展为审核日志"
+            ].map((item) => `
+              <article class="account-settings-row">
+                <span>${escapeHtml(item)}</span>
+                ${icon("chevron_right")}
+              </article>
+            `).join("")}
+          </div>
+        </section>
+      </section>
     `;
-    return pageShell("审核后台", flow.title, flow.subtitle, body, "admin-page");
+    return pageShell("管理员主页", flow.title, flow.subtitle, body, "admin-page");
   }
 
   function renderSearch(appContent, state) {

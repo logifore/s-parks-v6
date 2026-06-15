@@ -338,8 +338,8 @@ window.SPARKS_CONTENT = {
     },
     auth: {
       title: "注册 / 登录",
-      subtitle: "第一版只做 UI 原型，不连接真实认证，避免泄露账号或 API 信息。",
-      steps: ["游客访问", "邮箱注册", "创作者身份申请", "个人主页初始化"]
+      subtitle: "V5 开始接入真实账号认证，支持账号名或邮箱登录，并按角色进入不同的个人主页。",
+      steps: ["账号登录", "读取角色资料", "进入对应主页", "保持登录态"]
     },
     licensing: {
       title: "购买 / 授权",
@@ -356,9 +356,14 @@ window.SPARKS_CONTENT = {
       ]
     },
     admin: {
-      title: "审核后台",
-      subtitle: "后台管理页原型：查看待审核素材、版权声明、质量标签和举报状态。",
-      queue: ["待审核 24", "版权复核 6", "标签需补充 11", "通过 168"]
+      title: "管理员主页",
+      subtitle: "把审核后台整合进管理员个人主页，在保留原有 UI 气质的基础上集中处理审核、版权复核与内容补充。",
+      queue: ["待审核 24", "版权复核 6", "标签需补充 11", "通过 168"],
+      reviewItems: [
+        { id: "SP-2048", title: "武士三视图", owner: "LogiFore", risk: "版权声明完整", status: "待审核", category: "角色资产" },
+        { id: "SP-2049", title: "日落河边场景组", owner: "LogiFore", risk: "需补充模型来源", status: "复核中", category: "场景图" },
+        { id: "SP-2050", title: "汉人服装造型", owner: "Aria Jin", risk: "标签不足", status: "待补充", category: "服装造型" }
+      ]
     },
     search: {
       title: "搜索结果",
