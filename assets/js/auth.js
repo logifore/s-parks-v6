@@ -23,13 +23,8 @@ window.SparksAuth = (() => {
     return !isPlaceholder(getSupabaseUrl()) && !isPlaceholder(getAnonKey());
   }
 
-  function isLocalDevHost() {
-    const hostname = window.location.hostname || "";
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "";
-  }
-
   function isLocalAuthEnabled() {
-    return Boolean(config.localAuthFallbackEnabled) && LOCAL_ACCOUNTS.length > 0 && isLocalDevHost();
+    return Boolean(config.localAuthFallbackEnabled) && LOCAL_ACCOUNTS.length > 0;
   }
 
   function isConfigured() {

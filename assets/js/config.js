@@ -3,12 +3,12 @@
 window.SPARKS_CONFIG = {
   version: "sparks-v5.0.2",
   authStorageKey: "sparks-v5-session",
-  localAuthFallbackEnabled: false,
+  localAuthFallbackEnabled: true,
   localAccounts: [
     {
       username: "yonghu",
       email: "yonghu@sparks.local",
-      password: "REPLACE_LOCAL_TEST_PASSWORD",
+      password: "123456",
       displayName: "普通用户",
       role: "user",
       creatorId: "",
@@ -17,7 +17,7 @@ window.SPARKS_CONFIG = {
     {
       username: "chuangzuo",
       email: "chuangzuo@sparks.local",
-      password: "REPLACE_LOCAL_TEST_PASSWORD",
+      password: "123456",
       displayName: "创作者",
       role: "creator",
       creatorId: "elena-voss",
@@ -26,7 +26,7 @@ window.SPARKS_CONFIG = {
     {
       username: "admin",
       email: "admin@sparks.local",
-      password: "REPLACE_LOCAL_ADMIN_PASSWORD",
+      password: "admin123456",
       displayName: "管理员",
       role: "admin",
       creatorId: "",

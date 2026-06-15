@@ -986,7 +986,7 @@ window.SparksRenderers = ((utils) => {
               ${error ? `<p class="auth-message auth-message-error">${escapeHtml(error)}</p>` : ""}
               ${configured ? `
                 <p class="auth-message">登录成功后会根据账号角色进入普通用户、创作者或管理员主页。</p>
-                ${authMode === "local" ? `<p class="auth-message auth-message-warning">当前正在使用本地开发测试账号模式。部署到公开站点前应切换到真实 Supabase 配置。</p>` : ""}
+                ${authMode === "local" ? `<p class="auth-message auth-message-warning">当前正在使用公开测试账号模式。后续接入 Supabase 后会切换到真实后端登录。</p>` : ""}
               ` : `<p class="auth-message auth-message-warning">当前未启用任何登录配置。</p>`}
             `}
           </div>
